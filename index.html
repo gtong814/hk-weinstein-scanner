@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HK Weinstein 四階段 + Mansfield RS 港股掃描器</title>
+  <style>
+    :root { --bg: #131722; --card: #1e222d; --border: #2a2e39; --text: #d1d4dc; --muted: #787b86; --green: #00e676; --red: #ff5252; --orange: #ffab40; --blue: #29b6f6; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding: 20px; }
+    .container { max-width: 1300px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 24px; color: #fff; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .stat-label { font-size: 12px; color: var(--muted); }
+    .stat-val { font-size: 22px; font-weight: bold; margin-top: 4px; color: #fff; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
+    .tab-btn { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .tab-btn.active { background: #2962ff; color: #fff; border-color: #2962ff; }
+    input, select { background: var(--card); color: #fff; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 14px; }
+    .table-wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+    th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+    th:first-child, td:first-child, th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4) { text-align: left; }
+    th { background: #181c27; color: var(--muted); font-weight: 600; position: sticky; top: 0; }
+    tr:hover { background: #262b38; }
+    a.ticker { color: var(--blue); text-decoration: none; font-weight: bold; }
+    a.ticker:hover { text-decoration: underline; }
+    .badge { padding: 3px 7px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; }
+    .s2 { background: rgba(0,230,118,0.15); color: var(--green); }
+    .s4 { background: rgba(255,82,82,0.15); color: var(--red); }
+    .s3 { background: rgba(255,171,64,0.15); color: var(--orange); }
+    .s1 { background: rgba(158,158,158,0.15); color: #b2b5be; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 全港股 Weinstein 四階段 + Mansfield RS 掃描儀</h1>
+    <div class="sub" id="updated-time">載入最新掃描數據中...</div>
+
+    <div class="stats">
+      <div class="stat-card"><div class="stat-label">有效掃描港股數</div><div class="stat-val" id="st-total">-</div></div>
+      <div class="stat-card"><div class="stat-label">本週觸發關鍵訊號</div><div class="stat-val pos" id="st-signals">-</div></div>
+      <div class="stat-card"><div class="stat-label">Stage 2 主升趨勢</div><div class="stat-val" id="st-s2">-</div></div>
+    </div>
+
+    <div class="controls">
+      <button class="tab-btn active" id="btn-signals" onclick="switchTab('signals')">🔥 焦點訊號股</button>
+      <button class="tab-btn" id="btn-all" onclick="switchTab('all')">📋 全港股清單</button>
+      <input type="text" id="search" placeholder="搜尋代號 (例如 0700)..." oninput="renderTable()" />
+      <select id="stage-filter" onchange="renderTable()">
+        <option value="ALL">所有階段</option>
+        <option value="Stage 2">Stage 2 (主升)</option>
+        <option value="Stage 1">Stage 1 (築底)</option>
+        <option value="Stage 3">Stage 3 (頭部)</option>
+        <option value="Stage 4">Stage 4 (下跌)</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>代號 (點擊看圖)</th>
+            <th>現價</th>
+            <th>階段</th>
+            <th>觸發訊號</th>
+            <th>Mansfield RS</th>
+            <th>30W MA</th>
+            <th>30W 斜率</th>
+            <th>乖離率</th>
+            <th>1W 基準預測</th>
+            <th>1W 預期波幅區間</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let rawData = { signals: [], all_stocks: [] };
+    let currentTab = 'signals';
+
+    async function loadData() {
+      try {
+        const res = await fetch('./results/latest_data.json?t=' + Date.now());
+        if (!res.ok) throw new Error("尚未產生 latest_data.json");
+        rawData = await res.json();
+        document.getElementById('updated-time').textContent = `最後更新時間：${rawData.updated_at}（每週六自動掃描）`;
+        document.getElementById('st-total').textContent = rawData.total_scanned;
+        document.getElementById('st-signals').textContent = rawData.signals_count;
+        const s2Count = rawData.all_stocks.filter(x => x.Stage.includes('Stage 2')).length;
+        document.getElementById('st-s2').textContent = s2Count;
+        renderTable();
+      } catch (err) {
+        document.getElementById('updated-time').textContent = "⚠️ 尚未找到數據，請先到 GitHub Actions 執行一次 Run workflow。";
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('btn-signals').classList.toggle('active', tab === 'signals');
+      document.getElementById('btn-all').classList.toggle('active', tab === 'all');
+      renderTable();
+    }
+
+    function renderTable() {
+      const q = document.getElementById('search').value.trim().toUpperCase();
+      const stageFlt = document.getElementById('stage-filter').value;
+      const list = currentTab === 'signals' ? rawData.signals : rawData.all_stocks;
+
+      const filtered = list.filter(item => {
+        const matchQ = !q || item.Ticker.toUpperCase().includes(q);
+        const matchS = stageFlt === 'ALL' || item.Stage.includes(stageFlt);
+        return matchQ && matchS;
+      });
+
+      const tbody = document.getElementById('tbody');
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#787b86;padding:24px;">沒有符合條件的股票</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => {
+        const tvCode = parseInt(r.Ticker.replace('.HK', ''), 10);
+        const tvUrl = `https://www.tradingview.com/chart/?symbol=HKEX:${tvCode}`;
+        const sCls = r.Stage.includes('2') ? 's2' : r.Stage.includes('4') ? 's4' : r.Stage.includes('3') ? 's3' : 's1';
+        const rsCls = r.Mansfield_RS >= 0 ? 'pos' : 'neg';
+        const pCls = r['1W_Base_%'] >= 0 ? 'pos' : 'neg';
+        const sign = r['1W_Base_%'] >= 0 ? '+' : '';
+        return `
+          <tr>
+            <td><a class="ticker" href="${tvUrl}" target="_blank">${r.Ticker} ↗</a></td>
+            <td>${r.Close}</td>
+            <td><span class="badge ${sCls}">${r.Stage}</span></td>
+            <td style="color:#ffeb3b;font-weight:600;">${r.Signals}</td>
+            <td class="${rsCls}">${r.Mansfield_RS}</td>
+            <td>${r['30W_MA']}</td>
+            <td class="${r['30W_Slope_%'] >= 0 ? 'pos' : 'neg'}">${r['30W_Slope_%']}%</td>
+            <td>${r['MA_Ext_%']}%</td>
+            <td class="${pCls}">${r['1W_Base']} (${sign}${r['1W_Base_%']}%)</td>
+            <td>${r['1W_Low']} ~ ${r['1W_High']}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
