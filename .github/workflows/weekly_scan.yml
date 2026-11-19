@@ -2,7 +2,7 @@ name: HK Stocks Weekly Weinstein Scanner
 
 on:
   schedule:
-    - cron: '0 2 * * 6'
+    - cron: '0 9 * * 1-5'
   workflow_dispatch:
 
 permissions:
