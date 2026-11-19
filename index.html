@@ -90,7 +90,7 @@
         const res = await fetch('./results/latest_data.json?t=' + Date.now());
         if (!res.ok) throw new Error("尚未產生 latest_data.json");
         rawData = await res.json();
-        document.getElementById('updated-time').textContent = `最後更新時間：${rawData.updated_at}（每週六自動掃描）`;
+        document.getElementById('updated-time').textContent = `最後更新時間：${rawData.updated_at}（每個交易日 17:00 自動掃描）`;
         document.getElementById('st-total').textContent = rawData.total_scanned;
         document.getElementById('st-signals').textContent = rawData.signals_count;
         const s2Count = rawData.all_stocks.filter(x => x.Stage.includes('Stage 2')).length;
