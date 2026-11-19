@@ -282,7 +282,16 @@ def main():
     print(f"\n掃描完成！共分析 {len(res_df)} 隻有效港股，其中 {len(focus_df)} 隻觸發關鍵訊號。")
     print(f"完整結果: {full_path}")
     print(f"焦點訊號: {focus_path}")
-
+    import json
+    web_data = {
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
+        "total_scanned": len(res_df),
+        "signals_count": len(focus_df),
+        "signals": focus_df.fillna("").to_dict(orient="records"),
+        "all_stocks": res_df.sort_values(by="Mansfield_RS", ascending=False).fillna("").to_dict(orient="records")
+    }
+    with open("results/latest_data.json", "w", encoding="utf-8") as f:
+        json.dump(web_data, f, ensure_ascii=False)
 
 if __name__ == "__main__":
     main()
