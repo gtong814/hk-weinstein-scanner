@@ -276,4 +276,8 @@ def send_telegram_message(text: str):
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     # Telegram 單則訊息上限 4096 字元
-    requests.post(url, json={"chat_id": chat_id, "text": text[:4000], "parse_mode": "Markdown
+    requests.post(url, json={"chat_id": chat_id, "text": text[:4000], "parse_mode": "Markdown"}, timeout=15)
+
+
+if __name__ == "__main__":
+    main()
