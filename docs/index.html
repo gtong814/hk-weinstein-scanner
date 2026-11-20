@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>全港股 Weinstein + Mansfield RS 掃描儀表板</title>
+  <style>
+    :root {
+      --bg: #131722; --panel: #1e222d; --border: #2a2e39;
+      --text: #d1d4dc; --muted: #787b86;
+      --green: #00e676; --red: #ff5252; --orange: #ffab40; --blue: #2979ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px; line-height: 1.5;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.9rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px 16px; cursor: pointer; transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--blue); }
+    .card-title { font-size: 0.85rem; color: var(--muted); }
+    .card-val { font-size: 1.6rem; font-weight: 700; margin-top: 4px; }
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 16px; margin-bottom: 16px;
+    }
+    input, select {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px; font-size: 0.9rem; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--blue); }
+    input[type="text"] { flex: 1; min-width: 200px; }
+    button {
+      background: var(--border); color: var(--text); border: none;
+      border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 0.9rem;
+    }
+    button:hover { background: #363a45; }
+    .table-wrap {
+      overflow-x: auto; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 8px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; white-space: nowrap; }
+    th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+    th:first-child, td:first-child, th:nth-child(2), td:nth-child(2), th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5) {
+      text-align: left;
+    }
+    th {
+      background: #181c27; color: var(--muted); font-weight: 600;
+      cursor: pointer; user-select: none; position: sticky; top: 0;
+    }
+    th:hover { color: var(--text); }
+    tr:hover { background: rgba(41, 121, 255, 0.08); }
+    a.ticker-link { color: #64b5f6; text-decoration: none; font-weight: 600; }
+    a.ticker-link:hover { text-decoration: underline; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; }
+    .s1 { background: rgba(158, 158, 158, 0.2); color: #bdbdbd; }
+    .s2 { background: rgba(0, 230, 118, 0.15); color: var(--green); }
+    .s3 { background: rgba(255, 171, 64, 0.15); color: var(--orange); }
+    .s4 { background: rgba(255, 82, 82, 0.15); color: var(--red); }
+    .sig-s2 { background: #00c853; color: #fff; margin-right: 4px; }
+    .sig-w3 { background: var(--blue); color: #fff; margin-right: 4px; }
+    .sig-w5 { background: #ff6d00; color: #fff; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .status-bar { margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>全港股 Weinstein + Mansfield RS 掃描儀表板</h1>
+      <div class="meta" id="meta-info">載入數據中...</div>
+    </header>
+
+    <div class="cards">
+      <div class="card" onclick="quickFilter('', 'S2強勢突破')">
+        <div class="card-title">S2 強勢突破 (RS+ 爆量)</div>
+        <div class="card-val pos" id="cnt-s2">-</div>
+      </div>
+      <div class="card" onclick="quickFilter('', 'W3主升')">
+        <div class="card-title">W3 主升浪爆發</div>
+        <div class="card-val" style="color: var(--blue);" id="cnt-w3">-</div>
+      </div>
+      <div class="card" onclick="quickFilter('', 'W5背離')">
+        <div class="card-title">W5 末升背離警示</div>
+        <div class="card-val" style="color: var(--orange);" id="cnt-w5">-</div>
+      </div>
+      <div class="card" onclick="quickFilter('2', '')">
+        <div class="card-title">Stage 2 主升趨勢總數</div>
+        <div class="card-val" id="cnt-stage2">-</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <input type="text" id="search" placeholder="搜尋股票代號或名稱 (例如 0700、TENCENT)..." />
+      <select id="stage-filter">
+        <option value="">全部階段</option>
+        <option value="2">Stage 2 (主升)</option>
+        <option value="1">Stage 1 (築底)</option>
+        <option value="3">Stage 3 (頭部)</option>
+        <option value="4">Stage 4 (下跌)</option>
+      </select>
+      <select id="signal-filter">
+        <option value="">全部訊號</option>
+        <option value="ANY">僅顯示有訊號</option>
+        <option value="S2強勢突破">S2 強勢突破</option>
+        <option value="W3主升">W3 主升</option>
+        <option value="W5背離">W5 背離</option>
+      </select>
+      <input type="number" id="min-rs" placeholder="最低 Mansfield RS" style="width: 155px;" step="1" />
+      <button onclick="resetFilters()">重設條件</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('Ticker')">代號 ↕</th>
+            <th onclick="sortBy('Name')">名稱 ↕</th>
+            <th onclick="sortBy('Close')">現價 ↕</th>
+            <th onclick="sortBy('Stage')">階段 ↕</th>
+            <th onclick="sortBy('Signal')">觸發訊號 ↕</th>
+            <th onclick="sortBy('Mansfield_RS')">Mansfield RS ↕</th>
+            <th onclick="sortBy('MA30_Slope_%')">30W 斜率 ↕</th>
+            <th onclick="sortBy('MA30_Ext_%')">30W 乖離 ↕</th>
+            <th onclick="sortBy('1W_Base_%')">1W 預期基準 ↕</th>
+            <th>1W 波幅區間</th>
+            <th onclick="sortBy('Weekly_Turnover_HKD')">週成交額 (M) ↕</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="status-bar" id="status-bar"></div>
+  </div>
+
+  <script>
+    let allStocks = [];
+    let sortKey = "Mansfield_RS";
+    let sortAsc = false;
+
+    async function loadData() {
+      try {
+        const res = await fetch("data.json?t=" + Date.now());
+        if (!res.ok) throw new Error("找不到 data.json");
+        const data = await res.json();
+
+        document.getElementById("meta-info").textContent =
+          `更新時間：${data.updated_at} ｜ 有效掃描：${data.total_scanned} 隻`;
+        document.getElementById("cnt-s2").textContent = data.counts.s2_breakout;
+        document.getElementById("cnt-w3").textContent = data.counts.w3_impulse;
+        document.getElementById("cnt-w5").textContent = data.counts.w5_warn;
+        document.getElementById("cnt-stage2").textContent = data.counts.stage2_total;
+
+        allStocks = data.stocks || [];
+        render();
+      } catch (err) {
+        document.getElementById("meta-info").textContent = "尚無掃描數據，請先執行 GitHub Actions。";
+      }
+    }
+
+    function tvUrl(ticker) {
+      const code = parseInt(ticker.replace(".HK", ""), 10);
+      return `https://www.tradingview.com/chart/?symbol=HKEX:${code}`;
+    }
+
+    function formatSignals(sig) {
+      if (!sig) return "";
+      return sig.split(" | ").map(s => {
+        const cls = s.includes("S2") ? "sig-s2" : s.includes("W3") ? "sig-w3" : "sig-w5";
+        return `<span class="badge ${cls}">${s}</span>`;
+      }).join("");
+    }
+
+    function render() {
+      const q = document.getElementById("search").value.trim().toLowerCase();
+      const stg = document.getElementById("stage-filter").value;
+      const sig = document.getElementById("signal-filter").value;
+      const minRsVal = document.getElementById("min-rs").value;
+      const minRs = minRsVal === "" ? -Infinity : parseFloat(minRsVal);
+
+      let filtered = allStocks.filter(s => {
+        if (q && !s.Ticker.toLowerCase().includes(q) && !s.Name.toLowerCase().includes(q)) return false;
+        if (stg && String(s.Stage) !== stg) return false;
+        if (sig === "ANY" && !s.Signal) return false;
+        if (sig && sig !== "ANY" && !s.Signal.includes(sig)) return false;
+        if (s.Mansfield_RS < minRs) return false;
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        const va = a[sortKey], vb = b[sortKey];
+        if (typeof va === "string") return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return sortAsc ? va - vb : vb - va;
+      });
+
+      const tbody = document.getElementById("tbody");
+      tbody.innerHTML = filtered.slice(0, 300).map(s => {
+        const rsCls = s.Mansfield_RS >= 0 ? "pos" : "neg";
+        const slpCls = s["MA30_Slope_%"] >= 0 ? "pos" : "neg";
+        const baseCls = s["1W_Base_%"] >= 0 ? "pos" : "neg";
+        const sign = s["1W_Base_%"] >= 0 ? "+" : "";
+        const turnoverM = (s.Weekly_Turnover_HKD / 1e6).toFixed(1);
+
+        return `
+          <tr>
+            <td><a class="ticker-link" href="${tvUrl(s.Ticker)}" target="_blank" rel="noopener">${s.Ticker}</a></td>
+            <td>${s.Name}</td>
+            <td>${s.Close.toFixed(3)}</td>
+            <td><span class="badge s${s.Stage}">${s.Stage_Label}</span></td>
+            <td>${formatSignals(s.Signal)}</td>
+            <td class="${rsCls}">${s.Mansfield_RS.toFixed(2)}</td>
+            <td class="${slpCls}">${s["MA30_Slope_%"].toFixed(2)}%</td>
+            <td>${s["MA30_Ext_%"].toFixed(2)}%</td>
+            <td class="${baseCls}">${s["1W_Base"].toFixed(3)} (${sign}${s["1W_Base_%"].toFixed(2)}%)</td>
+            <td>${s["1W_Low"].toFixed(3)} ~ ${s["1W_High"].toFixed(3)}</td>
+            <td>${turnoverM}M</td>
+          </tr>
+        `;
+      }).join("");
+
+      document.getElementById("status-bar").textContent =
+        `符合條件：${filtered.length} 隻` + (filtered.length > 300 ? "（為保持流暢，僅顯示前 300 筆，請使用搜尋或篩選縮小範圍）" : "");
+    }
+
+    function sortBy(key) {
+      if (sortKey === key) sortAsc = !sortAsc;
+      else { sortKey = key; sortAsc = false; }
+      render();
+    }
+
+    function quickFilter(stage, signal) {
+      document.getElementById("stage-filter").value = stage;
+      document.getElementById("signal-filter").value = signal;
+      render();
+    }
+
+    function resetFilters() {
+      document.getElementById("search").value = "";
+      document.getElementById("stage-filter").value = "";
+      document.getElementById("signal-filter").value = "";
+      document.getElementById("min-rs").value = "";
+      render();
+    }
+
+    ["search", "stage-filter", "signal-filter", "min-rs"].forEach(id => {
+      document.getElementById(id).addEventListener("input", render);
+      document.getElementById(id).addEventListener("change", render);
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
