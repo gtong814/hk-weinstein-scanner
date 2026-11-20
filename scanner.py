@@ -52,7 +52,7 @@ def fetch_hk_stock_list() -> dict:
     header_row = None
     for i in range(10):
         row_vals = raw_df.iloc[i].astype(str).tolist()
-        if any("Stock Code" in v for v in row_vals):
+        if any("Stock Code" in str(v) for v in row_vals):
             header_row = i
             break
 
